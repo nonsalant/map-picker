@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>map-picker inside a modal demo</title>
+
+    <link rel="stylesheet" href="./map-picker/map-picker.css">
+    <script type="module" src="./map-picker/map-picker.js"></script>
+
+    <style>
+        /* Demo styles */
+        html { color-scheme: light dark; }
+        body { width: 90%; max-width: min(700px, 100%); margin-inline: auto; }
+        [popover] { padding: 1lh; border-radius: .5lh; }
+        /* hide reset button if it follows an empty output */
+        output:empty + br + .reset-location { display: none; }
+    </style>
+
+    <!-- Demo implementation -->
+    <script type="module">
+        const outputEl = document.querySelector('output');
+        // Inject coordinates and address when 'map-picker-confirm' custom event is fired
+        document.addEventListener('map-picker-confirm', (e) => {
+            outputEl.innerText = `[${e.detail.latitude}, ${e.detail.longitude}]: ${e.detail.address}`;
+        });
+        // Clear the <output> element when the 'map-picker-reset' custom event is fired
+        document.addEventListener('map-picker-reset', () => { outputEl.innerText=''; });
+    </script>
+
+</head>
+<body>
+
+<h2><span aria-hidden="true">📌</span> Select a location</h2>
+<button popovertarget="map-wrapper" type="button">Open Map</button>
+
+<output></output><br>
+
+<button class="reset-location" type="button">
+    <span aria-hidden="true">❌</span> <span>Reset Location</span>
+</button>
+
+<div id="map-wrapper" popover>
+	
+	<p>
+		Click on the map to place a pin at your location. Use <kbd>+</kbd> and <kbd>-</kbd> 
+		to zoom in and out (press <kbd>H</kbd> to view all keyboard shortcuts).
+	</p>
+	
+	<map-picker 
+		map-autofocus 
+		confirm=".confirm-location" 
+		reset=".reset-location" 
+		initial-coordinates="39.8283,-98.5795" 
+		initial-zoom="4"
+	></map-picker>
+	
+	<div class="map-controls">
+			<button popovertarget="map-wrapper" popovertargetaction="hide" type="button">
+					Cancel
+			</button>
+			<button class="confirm-location" popovertarget="map-wrapper" popovertargetaction="hide" type="button">
+					<span aria-hidden="true">✅</span> <span>Confirm Location</span>
+			</button>
+	</div>
+	
+</div>
+
+</body>
+</html>
