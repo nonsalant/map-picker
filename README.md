@@ -1,7 +1,8 @@
 # map-picker
-Web component that produces a map for a location picker using Open Street Maps and Leaflet.js
-
-It takes a CSS selector for a “Confirm Location” button via the `confirm` attribute.
+The web component takes a CSS selector for a “Confirm Location” button via the `confirm` attribute, e.g:
+```js
+<map-picker confirm="#confirm-location"></map-picker>
+```
 
 When clicked this button dispatches a `map-picker-confirm` custom event with the following data on the event’s `detail` object: `{latitude, longitude, address}`
 
@@ -19,9 +20,9 @@ Works inside the Light DOM or inside another web component’s Shadow DOM.
 <script type="module" src="./map-picker/map-picker.js"></script>
 ```
 
-Note: by default the Leaflet.js script and style will be dynamically included from local minified files in the `vendor-leaflet` folder.
+Note: by default the [Leaflet](https://github.com/Leaflet/Leaflet) script and style will be dynamically included from local minified files in the `vendor-leaflet` folder.
 
-If you'd like to load the Leaflet.js files from a CDN (unminified) you should edit the map-picker.js file by commenting out 3 lines and uncommenting the other 3 at the top of the file:
+If you'd like to load the Leaflet files from a CDN (and not minified) you should edit the map-picker.js file by commenting out 3 lines and uncommenting the other 3 at the top of the file:
 
 ```js
 let Leaflet; // Will be imported dynamically in connectedCallback()
