@@ -9,7 +9,7 @@ Works inside the Light DOM or inside another web component’s Shadow DOM.
 
 ## Demos from CodePen
 * [Map for location picker](https://codepen.io/nonsalant/pen/ZYGoJab)
-* [Map inside a modal](https://codepen.io/nonsalant/pen/LEVmjQz)
+* [Map inside a modal (popover)](https://codepen.io/nonsalant/pen/LEVmjQz)
 
 ## Usage
 
