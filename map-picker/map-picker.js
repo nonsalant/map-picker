@@ -150,7 +150,7 @@ export default class MapPicker extends HTMLElement {
                 if (e.target.matches('[role=button]')) return; // Ignore if focused on a button
                 e.preventDefault();
                 this.handleConfirm(e);
-                this.closest('[popover]')?.hidePopover();
+								this.closest('[popover]')?.hidePopover();
             },
             // 'Escape': (e) => {
             //     e.preventDefault();
@@ -202,7 +202,7 @@ export default class MapPicker extends HTMLElement {
         };
 
         mapElement.addEventListener('keydown', (e) => {
-            if (e.metaKey) return;
+						if (e.metaKey) return;
             const handler = keyHandlers[e.code];
             if (handler) handler(e);
         });
@@ -229,7 +229,7 @@ export default class MapPicker extends HTMLElement {
         this.marker.bindPopup(MapPicker.#createPopup({ loading: true })).openPopup();
         
         // Get address and update popup
-        const address = await this.#getAddressFromCoordinates(lat, lng);
+        const address = await getAddressFromCoordinates(lat, lng);
         this.address = address || null;
         this.marker.setPopupContent(MapPicker.#createPopup({ address, coordinates: { lat, lng } }));
 
@@ -237,21 +237,21 @@ export default class MapPicker extends HTMLElement {
         this.#dispatchEventWithMarkerData('map-picker-marker-set');
     }
     
-    async #getAddressFromCoordinates(lat, lng) {
-        // Get address from coordinates using reverse geocoding
-        const geocodingParams = `format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=0`;
-        const url = `https://nominatim.openstreetmap.org/reverse?${geocodingParams}`;
-        // 'app-name/version author'
-        const headers = { 'User-Agent': 'map-picker/1.0' };
-        try {
-            const response = await fetch(url, { headers });
-            const data = await response.json();
-            return data.display_name || null;
-        } catch (error) {
-            console.error('Failed to get address:', error);
-            return null;
-        }
-    }
+    // async #getAddressFromCoordinates(lat, lng) { // not debounced
+    //     // Get address from coordinates using reverse geocoding
+    //     const geocodingParams = `format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=0`;
+    //     const url = `https://nominatim.openstreetmap.org/reverse?${geocodingParams}`;
+    //     // 'app-name/version author'
+    //     const headers = { 'User-Agent': 'map-picker/1.0' };
+    //     try {
+    //         const response = await fetch(url, { headers });
+    //         const data = await response.json();
+    //         return data.display_name || null;
+    //     } catch (error) {
+    //         console.error('Failed to get address:', error);
+    //         return null;
+    //     }
+    // }
 
     // Dispatch a custom event with marker data
     #dispatchEventWithMarkerData(eventName) {
@@ -312,3 +312,157 @@ function observeIntersection(element, callback) {
         isIntersecting && callback()
     )).observe(element);
 }
+
+/**
+ * ReverseGeocoder provides reverse geocoding functionality with caching and debounced requests.
+ * 
+ * It converts latitude and longitude coordinates into human-readable addresses by querying
+ * the Nominatim OpenStreetMap API. To optimize performance and reduce network traffic, it:
+ * 
+ * - Caches results for previously requested coordinates.
+ * - Debounces rapid requests using a leading call strategy to respond immediately on the first call.
+ * - Deduplicates concurrent requests for the same coordinates.
+ * 
+ * Usage example:
+ * ```
+ * const geocoder = new ReverseGeocoder();
+ * const address = await geocoder.getAddressFromCoordinates(40.7128, -74.0060);
+ * console.log(address);
+ * ```
+ * 
+ * @class
+ */
+class ReverseGeocoder {
+  constructor() {
+    this.cache = new Map();
+    this.pendingRequests = new Map();
+    this.DEBOUNCE_DELAY = 1000;
+
+    this.debounceTimer = null;
+    this.hasExecutedImmediately = false;
+    this.pendingResolvers = [];
+    this.lastArgs = null; // To hold latest lat,lng for trailing call
+  }
+
+  /**
+   * Get address from coordinates with leading debounce and caching
+   * @param {number} lat - Latitude
+   * @param {number} lng - Longitude
+   * @returns {Promise<string|null>} Address or null on error
+   */
+  async getAddressFromCoordinates(lat, lng) {
+    const cacheKey = `${lat},${lng}`;
+
+    // Return cached result if available
+    if (this.cache.has(cacheKey)) {
+      return this.cache.get(cacheKey);
+    }
+
+    // Return existing promise if request is pending
+    if (this.pendingRequests.has(cacheKey)) {
+      return this.pendingRequests.get(cacheKey);
+    }
+
+    // If leading call not executed recently, execute immediately
+    if (!this.hasExecutedImmediately) {
+      this.hasExecutedImmediately = true;
+
+      const immediatePromise = this.#fetchAddress(lat, lng)
+        .then(result => {
+          this.cache.set(cacheKey, result);
+          this.pendingRequests.delete(cacheKey);
+
+          // Resolve any queued resolvers with this result
+          this.pendingResolvers.forEach(resolve => resolve(result));
+          this.pendingResolvers = [];
+
+          return result;
+        })
+        .finally(() => {
+          // Reset flag after debounce delay
+          setTimeout(() => {
+            this.hasExecutedImmediately = false;
+            // If there are queued calls, trigger trailing execution
+            if (this.pendingResolvers.length > 0 && this.lastArgs) {
+              this.#executeTrailing();
+            }
+          }, this.DEBOUNCE_DELAY);
+        });
+
+      this.pendingRequests.set(cacheKey, immediatePromise);
+      return immediatePromise;
+    }
+
+    // For calls during debounce window, queue resolvers and update lastArgs
+    this.lastArgs = { lat, lng };
+
+    const trailingPromise = new Promise(resolve => {
+      this.pendingResolvers.push(resolve);
+    });
+
+    // Clear and reset debounce timer for trailing call
+    clearTimeout(this.debounceTimer);
+    this.debounceTimer = setTimeout(() => {
+      this.#executeTrailing();
+    }, this.DEBOUNCE_DELAY);
+
+    return trailingPromise;
+  }
+
+  // Internal method to execute trailing call with latest args
+  async #executeTrailing() {
+    if (!this.lastArgs) return;
+
+    const { lat, lng } = this.lastArgs;
+    const cacheKey = `${lat},${lng}`;
+
+    try {
+      const result = await this.#fetchAddress(lat, lng);
+      this.cache.set(cacheKey, result);
+      this.pendingResolvers.forEach(resolve => resolve(result));
+    } catch {
+      this.pendingResolvers.forEach(resolve => resolve(null));
+    } finally {
+      this.pendingResolvers = [];
+      this.pendingRequests.delete(cacheKey);
+      this.lastArgs = null;
+    }
+  }
+
+  /**
+   * Fetch address from coordinates (uncached)
+   * @private
+   */
+  async #fetchAddress(lat, lng) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+    try {
+      const params = new URLSearchParams({
+        format: 'json',
+        lat,
+        lon: lng,
+        zoom: 18,
+        addressdetails: 0
+      });
+
+      const response = await fetch(`https://nominatim.openstreetmap.org/reverse?${params}`, {
+        headers: { 'User-Agent': 'map-picker/1.0' },
+        signal: controller.signal
+      });
+
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+      const data = await response.json();
+      return data.display_name || null;
+    } catch (error) {
+      console.error('Geocoding failed:', error);
+      throw error;
+    } finally {
+      clearTimeout(timeoutId);
+    }
+  }
+}
+// Usage:
+const geocoder = new ReverseGeocoder();
+export const getAddressFromCoordinates = geocoder.getAddressFromCoordinates.bind(geocoder);
