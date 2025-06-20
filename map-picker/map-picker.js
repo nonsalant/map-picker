@@ -273,7 +273,7 @@ export default class MapPicker extends HTMLElement {
                 ? MapPicker.#addressTemplate(address)
                 : MapPicker.#coordinatesTemplate(coordinates.lat, coordinates.lng);
     
-        return `<div class="popup-address">${content}</div>`;
+        return `<div class="popup-address" aria-live="polite">${content}</div>`;
     }
     
     static #loadingTemplate() {
