@@ -30,11 +30,11 @@ export default class MapPicker extends HTMLElement {
         this.map = null;
         this.marker = null;
         this.address = null; // Store the address of the marker
-
-        this.setAttribute('aria-busy', 'true'); // Initially busy while loading
     }
 
     connectedCallback() {
+        this.setAttribute('aria-busy', 'true'); // Initially busy while loading
+
         // Load Leaflet first, then initialize
         import(`${BASE_URL}/${LEAFLET_SCRIPT}`).then(module => {
             Leaflet = module;
