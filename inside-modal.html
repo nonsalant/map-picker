@@ -22,7 +22,7 @@
         const outputEl = document.querySelector('output');
         // Inject coordinates and address when 'map-picker-confirm' custom event is fired
         document.addEventListener('map-picker-confirm', (e) => {
-            outputEl.innerText = `[${e.detail.latitude}, ${e.detail.longitude}]: ${e.detail.address}`;
+            outputEl.innerText = `[${e.lat}, ${e.lng}]: ${e.address}`;
         });
         // Clear the <output> element when the 'map-picker-reset' custom event is fired
         document.addEventListener('map-picker-reset', () => { outputEl.innerText=''; });

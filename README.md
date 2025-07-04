@@ -78,35 +78,36 @@ document.addEventListener('map-picker-confirm', (event) => {
 
 ## Attributes for the `<map-picker>` element
 
-| Attribute              | Default Value | Description                                                                 |
-|------------------------|---------------|-----------------------------------------------------------------------------|
-| `confirm`              | `""`              | CSS selector for the “Confirm Location” button(s).                            |
-| `reset`                | `""`              | CSS selector for the “Reset Map” button(s).                               |
-| `initial-coordinates`  | `"39.8283,-98.5795"` | Initial coordinates for the map in the format `latitude,longitude` (no spaces). Defaults to USA.        |
-| `initial-zoom`         | `"4"`           | Initial zoom level for the map.                                            |
-| `map-autofocus`       | `undefined`       | Doesn't need a value. If this attribute is present the map will be focused when the it becomes visible. Useful when opening the map in a modal.        |
-| `shadowRootHost` | `undefined`       | If this attribute is present, the script will look for the "Confirm Location" and "Reset Map" buttons inside the Shadow DOM of the element with this selector and the events will be dispatched directly on the shadowRoot of that element. |
-| `host` | `undefined`       | If this attribute is present, the script will look for the "Confirm Location" and "Reset Map" buttons inside the Light DOM of the element with this selector and the events will be dispatched directly on that element. |
+| Attribute              | Default Value        | Description                                                             |
+|------------------------|----------------------|-------------------------------------------------------------------------|
+| `confirm`              | `""`                 | CSS selector for the “Confirm Location” button(s).                      |
+| `reset`                | `""`                 | CSS selector for the “Reset Map” button(s).                             |
+| `initial-coordinates`  | `"39.8283,-98.5795"` | Initial coordinates to center the map view in the format `latitude,longitude` (no spaces). Defaults to USA. |
+| `initial-zoom`         | `"4"`                | Initial zoom level for the map.                                         |
+| `marker-coordinates`   | `undefined`          | Coordinates for an initial marker in the format `latitude,longitude` (no spaces). If not set, no marker will be initially shown. |
+| `map-autofocus`        | `undefined`          | Doesn't need a value. If this attribute is present the map will be focused when the it becomes visible. Useful when opening the map in a modal. |
+| `shadow-root-host`     | `undefined`          | If this attribute is present, the script will look for the "Confirm Location" and "Reset Map" buttons inside the Shadow DOM of the element with this selector and the events will be dispatched directly on the shadowRoot of that element. |
+| `host`                 | `undefined`          | If this attribute is present, the script will look for the "Confirm Location" and "Reset Map" buttons inside the Light DOM of the element with this selector and the events will be dispatched directly on that element. If not set the button(s) are assumed to be anywhere in the body. Is ignored if `shadow-root-host` is also set. |
 
 
-## Custom Events
+## Events
 
 ### `map-picker-confirm`
 This event is dispatched when the user clicks the “Confirm Location” button(s) (defined by a CSS selector in the `confirm` attribute).
 
-The event's `detail` object looks like this:
+The event object looks like this:
 ```json
 {
-  "latitude": "39.842286",
-  "longitude": "-98.613281",
+  "lat": "39.842286",
+  "lng": "-98.613281",
   "address": "120 Road, Smith County, Kansas, 66952, United States"
 }
 ```
 Example implementation:
 ```js
 document.addEventListener('map-picker-confirm', (event) => {
-    const { latitude, longitude, address } = event.detail;
-    console.log(`Location confirmed: ${latitude}, ${longitude} - ${address}`);
+    const { lat, lng, address } = event;
+    console.log(`Location confirmed: ${lat}, ${lng} - ${address}`);
 });
 ```
 
@@ -121,18 +122,18 @@ document.addEventListener('map-picker-reset', (event) => {
 ```
 
 ## `map-picker-marker-set`
-This event is dispatched when the user sets a marker on the map by clicking on it. The event's `detail` object looks like this:
+This event is dispatched when the user sets a marker on the map by clicking on it. The event object looks like this:
 ```json
 {
-  "latitude": "39.842286",
-  "longitude": "-98.613281",
+  "lat": "39.842286",
+  "lng": "-98.613281",
   "address": "120 Road, Smith County, Kansas, 66952, United States"
 }
 ```
 Example implementation:
 ```js
 document.addEventListener('map-picker-marker-set', (event) => {
-    const { latitude, longitude, address } = event.detail;
-    console.log(`Marker set: ${latitude}, ${longitude} - ${address}`);
+    const { lat, lng, address } = event.detail;
+    console.log(`Marker set: ${lat}, ${lng} - ${address}`);
 });
 ```

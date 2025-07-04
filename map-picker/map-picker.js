@@ -33,8 +33,8 @@ export default class MapPicker extends HTMLElement {
     }
 
     connectedCallback() {
-        this.setAttribute('aria-busy', 'true'); // Initially busy while loading
-
+        this.ariaBusy = true; // Initially busy while loading
+        
         // Load Leaflet first, then initialize
         import(`${BASE_URL}/${LEAFLET_SCRIPT}`).then(module => {
             Leaflet = module;
@@ -69,14 +69,17 @@ export default class MapPicker extends HTMLElement {
 
     #init() {
         this.#setupMap();
+        // this.#initMarkerCoordinates();
+        this.#setupIntersectionObserver();
         this.#setupEventListeners();
     }
 
     resetMap() {
-        if (this.map) this.map.remove();
-        this.marker = null; // Reset marker reference
-        this.#setupMap();
-				this.map.getContainer().focus();
+        if (this.marker) this.map.removeLayer(this.marker);
+        this.marker = null; // Clear marker reference
+        this.address = null; // Clear the address
+        this.map.setView(this.initialCoords, this.initialZoom);
+        // this.map.getContainer().focus();
     }
 
     #setupMap() {
@@ -86,39 +89,61 @@ export default class MapPicker extends HTMLElement {
         this.map = new Leaflet.Map(this).setView(this.initialCoords, this.initialZoom);
     
         const tileUrl = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
-        const attribution = `&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors | 
-                            <a href="https://nominatim.org" title="Geocoding by Nominatim">Nominatim</a>`;
+        const attribution = MapPicker.#mapAttribution();
         const tileLayer = new Leaflet.TileLayer(tileUrl, {maxZoom: 19, attribution: attribution});
         this.#setAriaBusyWhenLoading(tileLayer);
+
         this.map.addLayer(tileLayer);
-        
-        this.#setupMapEventsListeners();
     }
 
-    #setupMapEventsListeners() {
-        this.map.on('click', (e) => {
-            this.setMarker(e.latlng.lat, e.latlng.lng);
-        });
-    }
-
-    #setupEventListeners() {
+    #setupIntersectionObserver() {
         // Intersection Observer to recalculate map size when it becomes visible
-        if (this.mapWrapper) observeIntersection(this.mapWrapper, () => {
+        observeIntersection(this.mapWrapper, () => {
+            this.#initMarkerCoordinates();
             this.map.invalidateSize();
             if (this.hasAttribute('map-autofocus')) this.map.getContainer().focus();
         });
+    }
 
-        this.#setupKeyboardControls(this.map.getContainer());
+    #initMarkerCoordinates() {
+        if (this.hasAttribute('marker-coordinates')) {
+            this.markerCoordinates = this.getAttribute('marker-coordinates').split(',').map(Number);
+            this.removeAttribute('marker-coordinates'); // Clear attribute after use
+        }
+    }
 
-        this.confirmLocation?.forEach(el=>{
-            el.addEventListener('click', e => this.handleConfirm(e));
+    /**
+     * Set coordinates for the map marker.
+     * @param {[number, number]} coords - Array with [latitude, longitude].
+     */
+    set markerCoordinates(coords) {
+        if (!coords || !coords.length === 2) return;
+        const [lat, lng] = coords;
+        this.map.setView(coords, 15);
+        this.setMarker(lat, lng);
+    }
+    
+    #setupEventListeners() {
+        this.map.on('click', (e) => {
+            this.setMarker(e.latlng.lat, e.latlng.lng);
+            this.#dispatchEventWithMarkerData('map-picker-marker-set');
+        });
+
+        setupKeyboardControls(this.map.getContainer(), this.map, {
+            setMarker: (lat, lng) => this.setMarker(lat, lng),
+            resetMap: () => this.resetMap(),
+            confirmLocation: () => this.confirmLocation[0]?.click()
+        });
+
+        this.confirmLocation?.forEach(el => {
+            el.addEventListener('click', (e) => this.handleConfirm(e));
         });
     
-        this.resetLocation?.forEach(el=>{
+        this.resetLocation?.forEach(el => {
             if (el.dataset.eventAdded) return; // Avoid duplicate listeners
-            el.addEventListener('click', e => {
-                // 📡 Dispatch a 'map-picker-reset' custom event
-                this.host.dispatchEvent(new CustomEvent('map-picker-reset'));
+            el.addEventListener('click', (e) => {
+                // 📡 Dispatch a 'map-picker-reset' event
+                this.host.dispatchEvent(new Event('map-picker-reset'));
             });
         });
 
@@ -132,137 +157,44 @@ export default class MapPicker extends HTMLElement {
         // 📡 Dispatch a custom event to notify that the location has been confirmed
         this.#dispatchEventWithMarkerData('map-picker-confirm');
 
-        // this.confirmLocation?.forEach(el=>el.setAttribute('aria-busy', 'true'));
-    }
-
-    #setupKeyboardControls(mapElement) {
-        const keyHandlers = {
-            'Space': (e) => {
-                if (e.target.matches('[role=button]')) { // press Space on a button
-                    e.target.click();
-                    return;
-                }
-                e.preventDefault();
-                const center = this.map.getCenter();
-                this.setMarker(center.lat, center.lng);
-            },
-            'Enter': (e) => {
-                if (e.target.matches('[role=button]')) return; // Ignore if focused on a button
-                e.preventDefault();
-                this.handleConfirm(e);
-								this.closest('[popover]')?.hidePopover();
-            },
-            // 'Escape': (e) => {
-            //     e.preventDefault();
-            //     this.closest('[popover]')?.hidePopover();
-            // }
-            'Minus': (e) => {
-                e.preventDefault();
-                this.map.zoomOut();
-            },
-            'Equal': (e) => {
-                e.preventDefault();
-                this.map.zoomIn();
-            },
-            'ArrowUp': (e) => {
-                e.preventDefault();
-                this.map.panBy([0, -50]); // Move up
-            },
-            'ArrowDown': (e) => {
-                e.preventDefault();
-                this.map.panBy([0, 50]); // Move down
-            },
-            'ArrowLeft': (e) => {
-                e.preventDefault();
-                this.map.panBy([-50, 0]); // Move left
-            },
-            'ArrowRight': (e) => {
-                e.preventDefault();
-                this.map.panBy([50, 0]); // Move right
-            },
-            'End': (e) => {
-                e.preventDefault();
-                this.map.setZoom(4); // Reset zoom level
-            },
-            'KeyR': (e) => {
-                e.preventDefault();
-                this.resetMap(); // Reset the map
-            },
-            'KeyH': (e) => {
-                e.preventDefault();
-                alert('Map Keyboard Shortcuts:\n\n' +
-                    'Space: Place marker at map center\n' +
-                    'Enter: Confirm location\n' +
-                    'Plus/Minus: Zoom in/out\n' +
-                    'Arrow keys: Pan map\n' +
-                    'R: Reset map\n' +
-                    'Escape: Close popover'
-                );
-            }
-        };
-
-        mapElement.addEventListener('keydown', (e) => {
-						if (e.metaKey) return;
-            const handler = keyHandlers[e.code];
-            if (handler) handler(e);
-        });
+        // this.confirmLocation?.forEach(el => el.ariaBusy = true);
     }
 
     #setAriaBusyWhenLoading(tileLayer) {
         let loadingTiles = 0; // Track loading tiles count
         tileLayer.on('loading', () => {
             loadingTiles++;
-            this.setAttribute('aria-busy', 'true');
+            this.ariaBusy = true;
         });
         tileLayer.on('load', () => {
             loadingTiles--;
-            if (!loadingTiles) this.removeAttribute('aria-busy');
+            if (!loadingTiles) this.ariaBusy = null;
         });
     }
 
-    async setMarker(lat, lng) {
+    async setMarker(lat, lng, showPopup = true) {
         // Set marker at given coordinates and fetch address
         if (this.marker) this.map.removeLayer(this.marker);
         this.marker = new Leaflet.Marker([lat, lng]).addTo(this.map);
         
         // Show popup with loading state
-        this.marker.bindPopup(MapPicker.#createPopup({ loading: true })).openPopup();
+        const popup = this.marker.bindPopup(MapPicker.#createPopup({ loading: true }));
+        if (showPopup) popup.openPopup();
         
         // Get address and update popup
         const address = await getAddressFromCoordinates(lat, lng);
         this.address = address || null;
         this.marker.setPopupContent(MapPicker.#createPopup({ address, coordinates: { lat, lng } }));
-
-        // 📡 Dispatch a custom event to notify that the location has been confirmed
-        this.#dispatchEventWithMarkerData('map-picker-marker-set');
     }
-    
-    // async #getAddressFromCoordinates(lat, lng) { // not debounced
-    //     // Get address from coordinates using reverse geocoding
-    //     const geocodingParams = `format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=0`;
-    //     const url = `https://nominatim.openstreetmap.org/reverse?${geocodingParams}`;
-    //     // 'app-name/version author'
-    //     const headers = { 'User-Agent': 'map-picker/1.0' };
-    //     try {
-    //         const response = await fetch(url, { headers });
-    //         const data = await response.json();
-    //         return data.display_name || null;
-    //     } catch (error) {
-    //         console.error('Failed to get address:', error);
-    //         return null;
-    //     }
-    // }
 
     // Dispatch a custom event with marker data
-    #dispatchEventWithMarkerData(eventName) {
+    #dispatchEventWithMarkerData(evName) {
         if (!this.marker) return;
-        this.host.dispatchEvent(new CustomEvent(eventName, {
-            detail: {
-                latitude: this.marker.getLatLng().lat.toFixed(6),
-                longitude: this.marker.getLatLng().lng.toFixed(6),
-                address: this.address || null
-            }
-        }));
+        const lat = this.marker.getLatLng().lat.toFixed(6);
+        const lng = this.marker.getLatLng().lng.toFixed(6);
+        this.host.dispatchEvent(new MarkerDataEvent(
+            evName, lat, lng, this.address || null 
+        ));
     }
     
     // Unified popup template method
@@ -301,13 +233,40 @@ export default class MapPicker extends HTMLElement {
         `;
     }
 
+    static #mapAttribution() {
+        return `&copy;
+            <a target="_blank" title="Open Street Maps"
+                href="https://www.openstreetmap.org/copyright"
+            >OSM</a> contributors |
+            Geocoding by <a target="_blank" href="https://nominatim.org">Nominatim</a> |
+            <a target="_blank" href="https://leafletjs.com" target="_blank"
+                title="A JavaScript library for interactive maps"
+            >Leaflet</a>`
+    }
+
 }
 
 customElements.define('map-picker', MapPicker);
 
+
+// Custom event to encapsulate marker data
+class MarkerDataEvent extends Event {
+  constructor(eventName, lat, lng, address) {
+    super(eventName, { bubbles: true, composed: true });
+    this.lat = lat;
+    this.lng = lng;
+    this.address = address;
+  }
+}
+// Usage example:
+// el.dispatchEvent(new MarkerDataEvent('map-picker-confirm', lat, lng, address));
+
+
+
+
 // Utils.
 
-function observeIntersection(element, callback) {
+export function observeIntersection(element, callback) {
     Object.assign(new IntersectionObserver(([{isIntersecting}]) => 
         isIntersecting && callback()
     )).observe(element);
@@ -322,13 +281,6 @@ function observeIntersection(element, callback) {
  * - Caches results for previously requested coordinates.
  * - Debounces rapid requests using a leading call strategy to respond immediately on the first call.
  * - Deduplicates concurrent requests for the same coordinates.
- * 
- * Usage example:
- * ```
- * const geocoder = new ReverseGeocoder();
- * const address = await geocoder.getAddressFromCoordinates(40.7128, -74.0060);
- * console.log(address);
- * ```
  * 
  * @class
  */
@@ -463,6 +415,88 @@ class ReverseGeocoder {
     }
   }
 }
-// Usage:
+// Export a singleton instance of ReverseGeocoder
 const geocoder = new ReverseGeocoder();
 export const getAddressFromCoordinates = geocoder.getAddressFromCoordinates.bind(geocoder);
+
+
+/**
+ * Sets up keyboard controls for a Leaflet map
+ * @param {HTMLElement} mapElement - The map container element
+ * @param {Object} mapInstance - The Leaflet map instance
+ * @param {Object} callbacks - Object containing callback functions
+ * @param {Function} callbacks.setMarker - Function to set marker at coordinates
+ * @param {Function} callbacks.resetMap - Function to reset the map
+ * @param {Function} callbacks.confirmLocation - Function to confirm location
+ */
+export function setupKeyboardControls(mapElement, mapInstance, callbacks) {
+    const { setMarker, resetMap, confirmLocation } = callbacks;
+    
+    const keyHandlers = {
+        'Space': (e) => {
+            if (e.target.matches('[role=button]')) {
+                e.target.click();
+                return;
+            }
+            e.preventDefault();
+            const center = mapInstance.getCenter();
+            setMarker(center.lat, center.lng);
+        },
+        'Enter': (e) => {
+            if (e.target.matches('[role=button]')) return;  // Ignore if focused on a button
+            if (e.target.matches('a')) return; // Ignore if focused on a link
+            e.preventDefault();
+            confirmLocation();
+        },
+        'Minus': (e) => {
+            e.preventDefault();
+            mapInstance.zoomOut();
+        },
+        'Equal': (e) => {
+            e.preventDefault();
+            mapInstance.zoomIn();
+        },
+        'ArrowUp': (e) => {
+            e.preventDefault();
+            mapInstance.panBy([0, -50]);
+        },
+        'ArrowDown': (e) => {
+            e.preventDefault();
+            mapInstance.panBy([0, 50]);
+        },
+        'ArrowLeft': (e) => {
+            e.preventDefault();
+            mapInstance.panBy([-50, 0]);
+        },
+        'ArrowRight': (e) => {
+            e.preventDefault();
+            mapInstance.panBy([50, 0]);
+        },
+        'End': (e) => {
+            e.preventDefault();
+            mapInstance.setZoom(4);
+        },
+        'KeyR': (e) => {
+            e.preventDefault();
+            resetMap();
+        },
+        'KeyH': (e) => {
+            e.preventDefault();
+            alert('Map Keyboard Shortcuts:\n\n' +
+                'Space: Place marker at map center\n' +
+                'Enter: Confirm location\n' +
+                'Plus/Minus: Zoom in/out\n' +
+                'Arrow keys: Pan map\n' +
+                'R: Reset map\n' +
+                'Escape: Close popover'
+            );
+        }
+    };
+
+    mapElement.addEventListener('keydown', (e) => {
+        if (e.metaKey) return;
+        const handler = keyHandlers[e.code];
+        if (handler) handler(e);
+    });
+}
+
