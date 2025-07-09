@@ -140,7 +140,6 @@ export default class MapPicker extends HTMLElement {
         });
     
         this.resetLocation?.forEach(el => {
-            if (el.dataset.eventAdded) return; // Avoid duplicate listeners
             el.addEventListener('click', (e) => {
                 // 📡 Dispatch a 'map-picker-reset' event
                 this.host.dispatchEvent(new Event('map-picker-reset'));
