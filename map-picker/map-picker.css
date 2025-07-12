@@ -8,6 +8,10 @@ map-picker {
     min-height: 400px;
     margin-block: .75lh;
 
+    .leaflet-control-zoom {
+        user-select: none;
+    }
+
     .leaflet-popup-content {
         max-width: min(24ch, calc(100vw - 10lh));
         margin: .5lh 1lh;
