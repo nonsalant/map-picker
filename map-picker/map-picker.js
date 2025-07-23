@@ -11,6 +11,16 @@ const LEAFLET_STYLESHEET = 'leaflet.min.css';
 // const LEAFLET_STYLESHEET = 'leaflet.css';
 
 export default class MapPicker extends HTMLElement {
+    static get observedAttributes() { return ['marker-coordinates']; }
+
+    attributeChangedCallback(name, oldValue, newValue) {
+        if (oldValue === newValue) return; // No change, no action
+        if (name === 'marker-coordinates' && newValue) {
+            const coords = newValue.split(',').map(Number);
+            this.setMarker(coords[0], coords[1]);
+        }
+    }
+
     static {
         // Preload appropriate marker icon based on device pixel ratio
         new Image().src = window.devicePixelRatio >= 2 
@@ -32,25 +42,25 @@ export default class MapPicker extends HTMLElement {
         this.address = null; // Store the address of the marker
     }
 
-    connectedCallback() {
-        this.ariaBusy = true; // Initially busy while loading
-        
-        // Load Leaflet first, then initialize
-        import(`${BASE_URL}/${LEAFLET_SCRIPT}`).then(module => {
-            Leaflet = module;
-            this.#init();
-        }).catch(error => console.error('Failed to load Leaflet:', error));
-        
-        // Add the Leaflet CSS stylesheet
-        this.addStylesheet(LEAFLET_STYLESHEET);
-    }
-
     #determineHost() {
         const shadowRootHost = this.getAttribute('shadow-root-host');
         const host = this.getAttribute('host');
         if (shadowRootHost) return document.querySelector(shadowRootHost)?.shadowRoot;
         if (host) return document.querySelector(host);
         return this.getRootNode();
+    }
+
+    connectedCallback() {
+        this.ariaBusy = true; // Initially busy while loading
+
+        // Load Leaflet first, then initialize
+        import(`${BASE_URL}/${LEAFLET_SCRIPT}`).then(module => {
+            Leaflet = module;
+            this.#init();
+        }).catch(error => console.error('Failed to load Leaflet:', error));
+
+        // Add the Leaflet CSS stylesheet
+        this.addStylesheet(LEAFLET_STYLESHEET);
     }
 
     addStylesheet(path) {
@@ -69,66 +79,55 @@ export default class MapPicker extends HTMLElement {
 
     #init() {
         this.#setupMap();
-        // this.#initMarkerCoordinates();
         this.#setupIntersectionObserver();
         this.#setupEventListeners();
-    }
-
-    resetMap() {
-        if (this.marker) this.map.removeLayer(this.marker);
-        this.marker = null; // Clear marker reference
-        this.address = null; // Clear the address
-        this.map.setView(this.initialCoords, this.initialZoom);
-        // this.map.getContainer().focus();
     }
 
     #setupMap() {
         // Set the default icon path for Leaflet
         Leaflet.Icon.Default.prototype.options.imagePath = `${BASE_URL}/images/`;
-    
+
         // Create map without default zoom control
         this.map = new Leaflet.Map(this, {
             zoomControl: false
         }).setView(this.initialCoords, this.initialZoom);
-
         // Add zoom control to the right side
         new Leaflet.Control.Zoom({ position: 'topright' }).addTo(this.map);
-    
+
         const tileUrl = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
         const attribution = MapPicker.#mapAttribution();
         const tileLayer = new Leaflet.TileLayer(tileUrl, {maxZoom: 19, attribution: attribution});
         this.#setAriaBusyWhenLoading(tileLayer);
 
         this.map.addLayer(tileLayer);
+
+        this.#inheritMarkerCoordinates();
+    }
+
+    #inheritMarkerCoordinates() {
+        // move attribute 'marker-coordinates' from mapWrapper to this component
+        if (!this.mapWrapper.hasAttribute('marker-coordinates')) return;
+        const coords = this.mapWrapper.getAttribute('marker-coordinates');
+        this.mapWrapper.removeAttribute('marker-coordinates'); // Clean up attribute
+        this.setAttribute('marker-coordinates', coords);
     }
 
     #setupIntersectionObserver() {
         // Intersection Observer to recalculate map size when it becomes visible
         observeIntersection(this.mapWrapper, () => {
-            this.#initMarkerCoordinates();
             this.map.invalidateSize();
+            this.#refreshMarker();
             if (this.hasAttribute('map-autofocus')) this.map.getContainer().focus();
-        });
+        }, false); // the false flag means it will not unobserve after the first intersection
     }
 
-    #initMarkerCoordinates() {
-        if (this.hasAttribute('marker-coordinates')) {
-            this.markerCoordinates = this.getAttribute('marker-coordinates').split(',').map(Number);
-            this.removeAttribute('marker-coordinates'); // Clear attribute after use
-        }
+    #refreshMarker() {
+        if (!this.hasAttribute('marker-coordinates')) return;
+        const coords = this.getAttribute('marker-coordinates').split(',').map(Number);
+        this.setMarker(coords[0], coords[1]);
+        this.map.setView(coords, 12);
     }
 
-    /**
-     * Set coordinates for the map marker.
-     * @param {[number, number]} coords - Array with [latitude, longitude].
-     */
-    set markerCoordinates(coords) {
-        if (!coords || !coords.length === 2) return;
-        const [lat, lng] = coords;
-        this.map.setView(coords, 15);
-        this.setMarker(lat, lng);
-    }
-    
     #setupEventListeners() {
         this.map.on('click', (e) => {
             this.setMarker(e.latlng.lat, e.latlng.lng);
@@ -159,10 +158,39 @@ export default class MapPicker extends HTMLElement {
     handleConfirm(e) {
         if (!this.marker) return alert('Please select a location on the map first.');
 
+        const { lat, lng } = this.marker.getLatLng();
+        this.setAttribute('marker-coordinates', `${lat},${lng}`);
+        this.map.setView([lat, lng], 12);
+
         // 📡 Dispatch a custom event to notify that the location has been confirmed
         this.#dispatchEventWithMarkerData('map-picker-confirm');
-
         // this.confirmLocation?.forEach(el => el.ariaBusy = true);
+    }
+
+    async setMarker(lat, lng, showPopup = true) {
+        if (!Leaflet) return; // ! Leaflet is not loaded
+
+        // Set marker at given coordinates and fetch address
+        if (this.marker) this.map.removeLayer(this.marker);
+        this.marker = new Leaflet.Marker([lat, lng]).addTo(this.map);
+
+        // Show popup with loading state
+        const popup = this.marker.bindPopup(MapPicker.#createPopup({ loading: true }));
+        if (showPopup) popup.openPopup();
+
+        // Get address and update popup
+        const address = await getAddressFromCoordinates(lat, lng);
+        this.address = address || null;
+        this.marker.setPopupContent(MapPicker.#createPopup({ address, coordinates: { lat, lng } }));
+    }
+
+    resetMap() {
+        if (this.marker) this.map.removeLayer(this.marker);
+        this.marker = null; // Clear marker reference
+        this.address = null; // Clear the address
+        this.removeAttribute('marker-coordinates'); // Clean up attribute
+        this.map.setView(this.initialCoords, this.initialZoom);
+        // this.map.getContainer().focus();
     }
 
     #setAriaBusyWhenLoading(tileLayer) {
@@ -177,21 +205,6 @@ export default class MapPicker extends HTMLElement {
         });
     }
 
-    async setMarker(lat, lng, showPopup = true) {
-        // Set marker at given coordinates and fetch address
-        if (this.marker) this.map.removeLayer(this.marker);
-        this.marker = new Leaflet.Marker([lat, lng]).addTo(this.map);
-        
-        // Show popup with loading state
-        const popup = this.marker.bindPopup(MapPicker.#createPopup({ loading: true }));
-        if (showPopup) popup.openPopup();
-        
-        // Get address and update popup
-        const address = await getAddressFromCoordinates(lat, lng);
-        this.address = address || null;
-        this.marker.setPopupContent(MapPicker.#createPopup({ address, coordinates: { lat, lng } }));
-    }
-
     // Dispatch a custom event with marker data
     #dispatchEventWithMarkerData(evName) {
         if (!this.marker) return;
@@ -201,7 +214,7 @@ export default class MapPicker extends HTMLElement {
             evName, lat, lng, this.address || null 
         ));
     }
-    
+
     // Unified popup template method
     static #createPopup({ loading = false, address = null, coordinates = null }) {
         const content = loading 
@@ -212,21 +225,21 @@ export default class MapPicker extends HTMLElement {
     
         return `<div class="popup-address" aria-live="polite">${content}</div>`;
     }
-    
+
     static #loadingTemplate() {
         return `
             <strong>Address:</strong>
             <div aria-busy="true" class="muted">loading...</div>
         `;
     }
-    
+
     static #addressTemplate(address) {
         return `
             <strong>Address:</strong>
             <div>${address}</div>
         `;
     }
-    
+
     static #coordinatesTemplate(lat, lng) {
         return `
             <div class="space-between">
