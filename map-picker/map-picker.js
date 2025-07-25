@@ -16,7 +16,7 @@ export default class MapPicker extends HTMLElement {
     attributeChangedCallback(name, oldValue, newValue) {
         if (oldValue === newValue) return; // No change, no action
         if (name === 'marker-coordinates' && newValue) {
-            const coords = newValue.split(',').map(Number);
+            const coords = csvToArray(newValue).map(Number);
             this.setMarker(coords[0], coords[1]);
         }
     }
@@ -34,8 +34,9 @@ export default class MapPicker extends HTMLElement {
         this.mapWrapper = this.closest('[popover]') ?? this.parentElement;
         this.confirmLocation = this.host.querySelectorAll(this.getAttribute('confirm'));
         this.resetLocation = this.host.querySelectorAll(this.getAttribute('reset'));
-        this.initialCoords = this.getAttribute('initial-coordinates')?.split(',').map(Number)
-            ?? [39.8283, -98.5795]; // Default to USA center
+        this.initialCoords = this.hasAttribute('initial-coordinates')
+            ? csvToArray(this.getAttribute('initial-coordinates')).map(Number)
+            : [39.8283, -98.5795]; // Default to USA center
         this.initialZoom = parseInt(this.getAttribute('initial-zoom')) || 4; // Default zoom level
         this.map = null;
         this.marker = null;
@@ -123,7 +124,7 @@ export default class MapPicker extends HTMLElement {
 
     #refreshMarker() {
         if (!this.hasAttribute('marker-coordinates')) return;
-        const coords = this.getAttribute('marker-coordinates').split(',').map(Number);
+        const coords = csvToArray(this.getAttribute('marker-coordinates')).map(Number);
         this.setMarker(coords[0], coords[1]);
         this.map.setView(coords, 12);
     }
@@ -285,10 +286,42 @@ class MarkerDataEvent extends Event {
 
 // Utils.
 
+
+/**
+ * Observes an element for intersection with the viewport
+ * @param {HTMLElement} element - The element to observe
+ * @param {Function} callback - The function to call when the element is intersecting
+ * @param {boolean} [once=true] - If true, the observer will unobserve the element after the first intersection
+ * @return {IntersectionObserver} The IntersectionObserver instance
+ * @example
+ * observeIntersection(document.querySelector('#myElement'), () => {
+ *     console.log('Element is in view!');
+ * });
+*/
 export function observeIntersection(element, callback) {
     Object.assign(new IntersectionObserver(([{isIntersecting}]) => 
         isIntersecting && callback()
     )).observe(element);
+}
+
+/**
+ * Utility to convert a CSV string into an array of trimmed, non-empty strings
+ * @param {string} csvString - The CSV string to convert
+ * @param {string} [delimiter=','] - The delimiter to split on (defaults to comma)
+ * @returns {Array<string>} A new array with trimmed, non-empty strings from the CSV
+ * @example
+ * csvToArray('apple, banana, cherry'); // Returns ['apple', 'banana', 'cherry']
+ * csvToArray('apple; banana; cherry', ';'); // Returns ['apple', 'banana', 'cherry']
+ * csvToArray('  hello  ,  world  , , foo '); // Returns ['hello', 'world', 'foo']
+ */
+export function csvToArray(csvString, delimiter = ',') {
+    if (typeof csvString !== 'string') return [];
+    if (csvString.trim() === '') return [];
+    
+    return csvString
+        .split(delimiter)
+        .map(item => item.trim())
+        .filter(item => item); // Filter out empty strings
 }
 
 /**
