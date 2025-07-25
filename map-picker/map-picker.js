@@ -137,7 +137,8 @@ export default class MapPicker extends HTMLElement {
         setupKeyboardControls(this.map.getContainer(), this.map, {
             setMarker: (lat, lng) => this.setMarker(lat, lng),
             resetMap: () => this.resetMap(),
-            confirmLocation: () => this.confirmLocation[0]?.click()
+            confirmLocation: () => this.confirmLocation[0]?.click(),
+            markerSetEvent: () => this.#dispatchEventWithMarkerData('map-picker-marker-set')
         });
 
         this.confirmLocation?.forEach(el => {
@@ -446,9 +447,10 @@ export const getAddressFromCoordinates = geocoder.getAddressFromCoordinates.bind
  * @param {Function} callbacks.setMarker - Function to set marker at coordinates
  * @param {Function} callbacks.resetMap - Function to reset the map
  * @param {Function} callbacks.confirmLocation - Function to confirm location
+ * @param {Function} callbacks.markerSetEvent - Function to dispatch marker set event
  */
 export function setupKeyboardControls(mapElement, mapInstance, callbacks) {
-    const { setMarker, resetMap, confirmLocation } = callbacks;
+    const { setMarker, resetMap, confirmLocation, markerSetEvent } = callbacks;
     
     const keyHandlers = {
         'Space': (e) => {
@@ -459,6 +461,7 @@ export function setupKeyboardControls(mapElement, mapInstance, callbacks) {
             e.preventDefault();
             const center = mapInstance.getCenter();
             setMarker(center.lat, center.lng);
+            markerSetEvent();
         },
         'Enter': (e) => {
             if (e.target.matches('[role=button]')) return;  // Ignore if focused on a button
