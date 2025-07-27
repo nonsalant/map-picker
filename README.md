@@ -4,7 +4,7 @@ The web component takes a CSS selector for a “Confirm Location” button via t
 <map-picker confirm="#confirm-location"></map-picker>
 ```
 
-When clicked this button dispatches a `map-picker-confirm` event on the document (or on the `RootNode`) with the following data inside the even object: `{latitude, longitude, address}`
+When clicked this button dispatches a `map-picker-confirm` event on the document (or on the `RootNode`) with the following data inside the event object: `{latitude, longitude, address}`
 
 Additionally, when the map is clicked (or the <knd>Space</knd> button is pressed) a marker (pin) is placed on the map and a `map-picker-marker-set` event is dispatched on the document (or on the `RootNode`) with the following data inside the event object: `{latitude, longitude, address}`
 
