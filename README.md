@@ -14,9 +14,15 @@ Works inside the Light DOM or inside another web component’s Shadow DOM.
 * [Map for location picker](https://codepen.io/nonsalant/pen/ZYGoJab)
 * [Map inside a modal (popover)](https://codepen.io/nonsalant/pen/LEVmjQz)
 
-## Usage
+## Importing the component files
 
-### Include the map-picker script and CSS in your HTML:
+### Importing the component from a CDN
+```html
+<link rel="stylesheet" href="https://unpkg.com/map-picker-component/map-picker.css">
+<script type="module" src="https://unpkg.com/map-picker-component/map-picker.js"></script>
+```
+
+### Importing the component from local files
 ```html
 <link rel="stylesheet" href="./map-picker/map-picker.css">
 <script type="module" src="./map-picker/map-picker.js"></script>
@@ -40,6 +46,8 @@ const LEAFLET_SCRIPT = 'leaflet-src.esm.js';
 const LEAFLET_STYLESHEET = 'leaflet.css';
 ```
 If you do this, you can also remove the `vendor-leaflet` folder from your project, as you will only need the `map-picker.js` and `map-picker.css` files (as in the CodePen examples linked above).
+
+## Usage
 
 ### Add the map-picker element to your HTML:
 ```html

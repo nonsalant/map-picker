@@ -1,0 +1,31 @@
+{
+  "name": "map-picker-component",
+  "version": "1.0.3",
+  "description": "A map picker web component that allows users to select a location on a map.",
+  "type": "module",
+  "main": "map-picker.js",
+  "files": [
+    "**/*"
+  ],
+  "scripts": {
+    "prepublishOnly": "cp ../README.md ./README.md"
+  },
+  "keywords": [
+    "web-component",
+    "map",
+    "picker",
+    "location",
+    "open-street-map",
+    "leaflet",
+    "geolocation"
+  ],
+  "author": "Stefan Matei (https://stefanmatei.com)",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nonsalant/map-picker.git"
+  },
+  "bugs": {
+    "url": "https://github.com/nonsalant/map-picker/issues"
+  },
+  "homepage": "https://github.com/nonsalant/map-picker#readme"
+}
