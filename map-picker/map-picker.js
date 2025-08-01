@@ -264,7 +264,7 @@ export default class MapPicker extends HTMLElement {
             >Leaflet</a>`
     }
 
-    // Define the custom element unless already defined
+    // Statically define the element unless ?define=false is set as an URL param
     static tag = "map-picker";
     static define(tag = this.tag) {
         this.tag = tag;
@@ -279,8 +279,6 @@ export default class MapPicker extends HTMLElement {
         if (tag !== "false") this.define(tag);
     }
 }
-
-// customElements.define('map-picker', MapPicker);
 
 
 // Custom event to encapsulate marker data
