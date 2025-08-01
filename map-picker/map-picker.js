@@ -1,12 +1,12 @@
 let Leaflet; // Will be imported dynamically in connectedCallback()
 
 /* 🏠 Local version */
-const BASE_URL = new URL('./vendor-leaflet', import.meta.url).pathname;
+const BASE_URL = import.meta.resolve('./vendor-leaflet/');
 const LEAFLET_SCRIPT = 'leaflet-src.esm.min.js';
 const LEAFLET_STYLESHEET = 'leaflet.min.css';
 
 /* 🔗 CDN version */
-// const BASE_URL = 'https://unpkg.com/leaflet@1.9.4/dist';
+// const BASE_URL = 'https://unpkg.com/leaflet@1.9.4/dist/';
 // const LEAFLET_SCRIPT = 'leaflet-src.esm.js';
 // const LEAFLET_STYLESHEET = 'leaflet.css';
 
@@ -24,8 +24,8 @@ export default class MapPicker extends HTMLElement {
     static {
         // Preload appropriate marker icon based on device pixel ratio
         new Image().src = window.devicePixelRatio >= 2 
-            ? `${BASE_URL}/images/marker-icon-2x.png`
-            : `${BASE_URL}/images/marker-icon.png`;
+            ? `${BASE_URL}images/marker-icon-2x.png`
+            : `${BASE_URL}images/marker-icon.png`;
     }
 
     constructor() {
@@ -55,20 +55,20 @@ export default class MapPicker extends HTMLElement {
         this.ariaBusy = true; // Initially busy while loading
 
         // Load Leaflet first, then initialize
-        import(`${BASE_URL}/${LEAFLET_SCRIPT}`).then(module => {
+        import(`${BASE_URL}${LEAFLET_SCRIPT}`).then(module => {
             Leaflet = module;
             this.#init();
         }).catch(error => console.error('Failed to load Leaflet:', error));
 
         // Add the Leaflet CSS stylesheet
-        this.addStylesheet(LEAFLET_STYLESHEET);
+        this.addStylesheet(`${BASE_URL}${LEAFLET_STYLESHEET}`);
     }
 
     addStylesheet(path) {
         return new Promise((resolve) => {
             const element = document.createElement('link');
             element.rel = 'stylesheet';
-            element.href = `${BASE_URL}/${path}`;
+            element.href = `${path}`;
             element.onload = () => resolve();
             element.onerror = (error) => {
                 console.warn(`map-picker.js failed to load stylesheet: ${path}`, error);
@@ -86,7 +86,7 @@ export default class MapPicker extends HTMLElement {
 
     #setupMap() {
         // Set the default icon path for Leaflet
-        Leaflet.Icon.Default.prototype.options.imagePath = `${BASE_URL}/images/`;
+        Leaflet.Icon.Default.prototype.options.imagePath = `${BASE_URL}images/`;
 
         // Create map without default zoom control
         this.map = new Leaflet.Map(this, {
