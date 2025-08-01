@@ -36,12 +36,12 @@ If you'd like to load the Leaflet files from a CDN (and not minified) you should
 let Leaflet; // Will be imported dynamically in connectedCallback()
 
 /* 🏠 Local version */
-// const BASE_URL = new URL('./vendor-leaflet', import.meta.url).pathname;
+// const BASE_URL = import.meta.resolve('./vendor-leaflet/');
 // const LEAFLET_SCRIPT = 'leaflet-src.esm.min.js';
 // const LEAFLET_STYLESHEET = 'leaflet.min.css';
 
 /* 🔗 CDN version */
-const BASE_URL = 'https://unpkg.com/leaflet@1.9.4/dist';
+const BASE_URL = 'https://unpkg.com/leaflet@1.9.4/dist/';
 const LEAFLET_SCRIPT = 'leaflet-src.esm.js';
 const LEAFLET_STYLESHEET = 'leaflet.css';
 ```
