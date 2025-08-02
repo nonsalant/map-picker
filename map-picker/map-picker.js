@@ -561,6 +561,7 @@ export function setupKeyboardControls(mapElement, mapInstance, callbacks) {
 
     mapElement.addEventListener('keydown', (e) => {
         if (e.metaKey) return;
+        if (e.ctrlKey) return;
         const handler = keyHandlers[e.code];
         if (handler) handler(e);
     });
